@@ -22,7 +22,7 @@ from app.services.card_normalisation import (
     normalise_set_code,
 )
 from app.services.collection_import import detect_columns, parse_collection_csv, sniff_csv
-from app.services.cube_comparison import compare_cube
+from app.services.cube_comparison import compare_cube, compare_cubes
 from app.services.exports import missing_cards_csv
 from app.services.ranking import rank_cubes
 
@@ -60,7 +60,7 @@ async def dashboard(
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
     cubes = session.scalars(select(Cube).order_by(Cube.name)).all()
-    comparisons = rank_cubes([compare_cube(session, cube) for cube in cubes], sort)
+    comparisons = rank_cubes(compare_cubes(session, cubes), sort)
     collection = session.scalars(
         select(Collection).order_by(Collection.imported_at.desc())
     ).first()

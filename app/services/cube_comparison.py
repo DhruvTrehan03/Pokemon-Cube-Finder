@@ -1,4 +1,5 @@
 import json
+from collections import defaultdict
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -55,7 +56,42 @@ class CubeComparison:
 
 
 def compare_cube(session: Session, cube: Cube) -> CubeComparison:
-    owned_cards = [
+    owned_cards = _owned_card_inputs(session)
+    cube_cards = [
+        _cube_card_input(card)
+        for card in session.scalars(
+            select(CubeCard).where(CubeCard.cube_id == cube.id).order_by(CubeCard.id)
+        ).all()
+    ]
+    rejected = _rejected_pairs(session)
+    allocations = allocate_cards(owned_cards, cube_cards, rejected_pairs=rejected)
+    return build_comparison(cube, allocations)
+
+
+def compare_cubes(session: Session, cubes: list[Cube]) -> list[CubeComparison]:
+    if not cubes:
+        return []
+    owned_cards = _owned_card_inputs(session)
+    rejected = _rejected_pairs(session)
+    cube_ids = [cube.id for cube in cubes]
+    cards_by_cube_id: dict[int, list[CubeCardInput]] = defaultdict(list)
+    for card in session.scalars(
+        select(CubeCard).where(CubeCard.cube_id.in_(cube_ids)).order_by(CubeCard.id)
+    ):
+        cards_by_cube_id[card.cube_id].append(_cube_card_input(card))
+    return [
+        build_comparison(
+            cube,
+            allocate_cards(
+                owned_cards, cards_by_cube_id.get(cube.id, []), rejected_pairs=rejected
+            ),
+        )
+        for cube in cubes
+    ]
+
+
+def _owned_card_inputs(session: Session) -> list[OwnedCardInput]:
+    return [
         OwnedCardInput(
             id=card.id,
             original_name=card.original_name,
@@ -66,28 +102,27 @@ def compare_cube(session: Session, cube: Cube) -> CubeComparison:
         )
         for card in session.scalars(select(OwnedCard).order_by(OwnedCard.id)).all()
     ]
-    cube_cards = [
-        CubeCardInput(
-            id=card.id,
-            original_name=card.original_name,
-            normalised_name=card.normalised_name,
-            set_name=card.set_name,
-            set_code=card.set_code,
-            collector_number=card.collector_number,
-            set_total=_cube_set_total(card),
-            required_quantity=card.required_quantity,
-        )
-        for card in session.scalars(
-            select(CubeCard).where(CubeCard.cube_id == cube.id).order_by(CubeCard.id)
-        ).all()
-    ]
-    rejected = {
+
+
+def _cube_card_input(card: CubeCard) -> CubeCardInput:
+    return CubeCardInput(
+        id=card.id,
+        original_name=card.original_name,
+        normalised_name=card.normalised_name,
+        set_name=card.set_name,
+        set_code=card.set_code,
+        collector_number=card.collector_number,
+        set_total=_cube_set_total(card),
+        required_quantity=card.required_quantity,
+    )
+
+
+def _rejected_pairs(session: Session) -> set[tuple[str, str]]:
+    return {
         (override.owned_card_signature, override.cube_card_signature)
         for override in session.scalars(select(CardMatchOverride)).all()
         if override.decision == "reject"
     }
-    allocations = allocate_cards(owned_cards, cube_cards, rejected_pairs=rejected)
-    return build_comparison(cube, allocations)
 
 
 def build_comparison(cube: Cube, allocations: list[CubeCardAllocation]) -> CubeComparison:
