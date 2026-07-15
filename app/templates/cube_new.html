@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Import Cube - Pokemon Cube Finder{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <h1>Import Cube</h1>
+    <p>Add a CubeKoga URL or paste a list manually.</p>
+  </div>
+</section>
+
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+<section class="split">
+  <form class="panel" action="/cubes/cubekoga" method="post">
+    <h2>CubeKoga URL</h2>
+    <label for="url">Public CubeKoga URL</label>
+    <input id="url" name="url" placeholder="https://cubekoga.net/..." required>
+    <button class="button primary" type="submit">Import URL</button>
+  </form>
+
+  <form class="panel" action="/cubes/manual" method="post">
+    <h2>Manual List</h2>
+    <label for="manual-name">Cube name</label>
+    <input id="manual-name" name="name" required>
+    <label for="author">Author</label>
+    <input id="author" name="author">
+    <label for="cards_text">Cards</label>
+    <textarea id="cards_text" name="cards_text" rows="14" placeholder="2 Pikachu&#10;Charmander&#10;Squirtle" required></textarea>
+    <button class="button primary" type="submit">Import Manual Cube</button>
+  </form>
+</section>
+{% endblock %}

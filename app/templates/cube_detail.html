@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}{{ cube.name }} - Pokemon Cube Finder{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <h1>{{ cube.name }}</h1>
+    <p>{{ cube.author or "Unknown author" }} · {{ cube.source_type }}</p>
+  </div>
+  <div class="actions">
+    <a class="button" href="/cubes/{{ cube.id }}/missing.csv">Export Missing CSV</a>
+  </div>
+</section>
+
+<section class="summary-grid">
+  <div class="metric"><span>Copy completion</span><strong>{{ "%.1f"|format(comparison.copy_completion * 100) }}%</strong></div>
+  <div class="metric"><span>Total copies</span><strong>{{ comparison.total_required_copies }}</strong></div>
+  <div class="metric"><span>Owned copies</span><strong>{{ comparison.owned_required_copies }}</strong></div>
+  <div class="metric"><span>Missing copies</span><strong>{{ comparison.missing_copies }}</strong></div>
+  <div class="metric"><span>Exact matches</span><strong>{{ comparison.exact_matched_copies }}</strong></div>
+  <div class="metric"><span>Name-only</span><strong>{{ comparison.name_only_matched_copies }}</strong></div>
+</section>
+
+<div class="progress"><span style="width: {{ comparison.copy_completion * 100 }}%"></span></div>
+
+<section class="section">
+  <h2>Missing Cards</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Card</th><th>Set</th><th>No.</th><th>Required</th><th>Owned</th><th>Missing</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        {% for item in comparison.allocations if item.missing_quantity > 0 %}
+        <tr>
+          <td>{{ item.cube_card.original_name }}</td>
+          <td>{{ item.cube_card.set_name or item.cube_card.set_code or "-" }}</td>
+          <td>{{ item.cube_card.collector_number or "-" }}</td>
+          <td>{{ item.cube_card.required_quantity }}</td>
+          <td>{{ item.owned_quantity }}</td>
+          <td>{{ item.missing_quantity }}</td>
+          <td><span class="badge">{{ item.status.value }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="empty">No missing cards.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section">
+  <h2>Owned Matches</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Cube card</th><th>Owned card</th><th>Qty</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for item in comparison.allocations %}
+          {% for allocation in item.allocations %}
+          <tr>
+            <td>{{ item.cube_card.original_name }}</td>
+            <td>{{ allocation.original_name }}</td>
+            <td>{{ allocation.quantity }}</td>
+            <td><span class="badge">{{ allocation.status.value }}</span></td>
+          </tr>
+          {% endfor %}
+        {% else %}
+        <tr><td colspan="4" class="empty">No matches yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
