@@ -34,6 +34,37 @@ def test_identifier_only_cube_card_can_exact_match_collection_printing() -> None
     assert allocations[0].status == MatchStatus.EXACT
 
 
+def test_set_number_fallback_matches_when_set_code_is_not_available() -> None:
+    owned = [OwnedCardInput(1, "Ducklett", "ducklett", None, "046/196", 1)]
+    cube_cards = [CubeCardInput(1, "Ducklett", "ducklett", "Lost Origin", None, "046", 1)]
+
+    allocations = allocate_cards(owned, cube_cards)
+
+    assert allocations[0].owned_quantity == 1
+    assert allocations[0].status == MatchStatus.SET_NUMBER
+
+
+def test_set_number_fallback_respects_cube_set_total_when_available() -> None:
+    owned = [OwnedCardInput(1, "Ducklett", "ducklett", None, "046/196", 1)]
+    cube_cards = [
+        CubeCardInput(
+            1,
+            "Ducklett",
+            "ducklett",
+            "Lost Origin",
+            None,
+            "046",
+            1,
+            set_total="200",
+        )
+    ]
+
+    allocations = allocate_cards(owned, cube_cards)
+
+    assert allocations[0].owned_quantity == 1
+    assert allocations[0].status == MatchStatus.NAME_ONLY
+
+
 def test_rejected_match_does_not_count_as_owned() -> None:
     owned = [OwnedCardInput(1, "Pikachu", "pikachu", None, None, 1)]
     cube_cards = [CubeCardInput(1, "Pikachu", "pikachu", None, None, None, 1)]

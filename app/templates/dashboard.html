@@ -39,6 +39,7 @@
         <th>Copy %</th>
         <th>Unique %</th>
         <th>Exact</th>
+        <th>Set-number</th>
         <th>Name-only</th>
         <th>Warnings</th>
         <th>Refreshed</th>
@@ -56,12 +57,13 @@
         <td>{{ "%.1f"|format(comparison.copy_completion * 100) }}%</td>
         <td>{{ "%.1f"|format(comparison.unique_completion * 100) }}%</td>
         <td>{{ comparison.exact_matched_copies }}</td>
+        <td>{{ comparison.set_number_matched_copies }}</td>
         <td>{{ comparison.name_only_matched_copies }}</td>
-        <td>{{ comparison.name_only_matched_copies + comparison.unresolved_match_count }}</td>
+        <td>{{ comparison.set_number_matched_copies + comparison.name_only_matched_copies + comparison.unresolved_match_count }}</td>
         <td>{{ comparison.cube.refreshed_at or comparison.cube.imported_at }}</td>
       </tr>
       {% else %}
-      <tr><td colspan="12" class="empty">No cubes imported yet.</td></tr>
+      <tr><td colspan="13" class="empty">No cubes imported yet.</td></tr>
       {% endfor %}
     </tbody>
   </table>

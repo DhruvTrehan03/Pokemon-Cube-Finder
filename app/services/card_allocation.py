@@ -1,11 +1,16 @@
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from app.services.card_normalisation import card_signature, collector_numbers_match
+from app.services.card_normalisation import (
+    card_signature,
+    collector_number_and_total_match,
+    collector_numbers_match,
+)
 
 
 class MatchStatus(StrEnum):
     EXACT = "exact"
+    SET_NUMBER = "set_number"
     NAME_ONLY = "name_only"
     UNRESOLVED = "unresolved"
     REJECTED = "rejected"
@@ -30,6 +35,7 @@ class CubeCardInput:
     set_code: str | None
     collector_number: str | None
     required_quantity: int
+    set_total: str | None = None
 
 
 @dataclass(frozen=True)
@@ -84,6 +90,29 @@ def allocate_cards(
         _consume(result, exact_candidates, remaining, required, MatchStatus.EXACT)
 
         if result.owned_quantity < required:
+            set_number_candidates = [
+                owned
+                for owned in owned_cards
+                if remaining[owned.id] > 0
+                and owned.normalised_name == cube_card.normalised_name
+                and owned.collector_number
+                and cube_card.collector_number
+                and collector_number_and_total_match(
+                    owned.collector_number,
+                    cube_card.collector_number,
+                    cube_card.set_total,
+                )
+                and not _is_rejected(owned, cube_card, rejected_pairs)
+            ]
+            _consume(
+                result,
+                set_number_candidates,
+                remaining,
+                required - result.owned_quantity,
+                MatchStatus.SET_NUMBER,
+            )
+
+        if result.owned_quantity < required:
             name_candidates = [
                 owned
                 for owned in owned_cards
@@ -103,6 +132,10 @@ def allocate_cards(
         if result.allocations:
             if any(allocation.status == MatchStatus.NAME_ONLY for allocation in result.allocations):
                 result.status = MatchStatus.NAME_ONLY
+            elif any(
+                allocation.status == MatchStatus.SET_NUMBER for allocation in result.allocations
+            ):
+                result.status = MatchStatus.SET_NUMBER
             else:
                 result.status = MatchStatus.EXACT
         results.append(result)

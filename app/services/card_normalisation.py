@@ -72,10 +72,30 @@ def collector_number_key(value: str | None) -> str | None:
     return normalised.split("/", 1)[0]
 
 
+def collector_set_total(value: str | None) -> str | None:
+    normalised = normalise_collector_number(value)
+    if not normalised or "/" not in normalised:
+        return None
+    total = normalised.split("/", 1)[1]
+    return total or None
+
+
 def collector_numbers_match(left: str | None, right: str | None) -> bool:
     left_key = collector_number_key(left)
     right_key = collector_number_key(right)
     return bool(left_key and right_key and left_key == right_key)
+
+
+def collector_number_and_total_match(
+    owned_collector_number: str | None,
+    cube_collector_number: str | None,
+    cube_set_total: str | None = None,
+) -> bool:
+    if not collector_numbers_match(owned_collector_number, cube_collector_number):
+        return False
+    if not cube_set_total:
+        return True
+    return collector_set_total(owned_collector_number) == normalise_collector_number(cube_set_total)
 
 
 def derive_set_code(value: str | None) -> str | None:

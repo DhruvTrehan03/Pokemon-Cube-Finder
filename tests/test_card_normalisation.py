@@ -1,5 +1,6 @@
 from app.services.card_normalisation import (
     clean_display_card_name,
+    collector_number_and_total_match,
     collector_numbers_match,
     derive_set_code,
     normalise_card_name,
@@ -30,3 +31,5 @@ def test_parses_cubekoga_card_identifier() -> None:
     assert parse_card_identifier("swsh11-046") == ("SWSH11", "046")
     assert parse_card_identifier("ex6-112") == ("EX6", "112")
     assert collector_numbers_match("046/196", "046")
+    assert collector_number_and_total_match("046/196", "046", "196")
+    assert not collector_number_and_total_match("046/196", "046", "200")

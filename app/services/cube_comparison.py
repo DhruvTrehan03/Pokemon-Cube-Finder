@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -24,6 +25,7 @@ class CubeComparison:
     fulfilled_unique_cards: int
     total_unique_cards: int
     exact_matched_copies: int
+    set_number_matched_copies: int
     name_only_matched_copies: int
     unresolved_match_count: int
 
@@ -72,6 +74,7 @@ def compare_cube(session: Session, cube: Cube) -> CubeComparison:
             set_name=card.set_name,
             set_code=card.set_code,
             collector_number=card.collector_number,
+            set_total=_cube_set_total(card),
             required_quantity=card.required_quantity,
         )
         for card in session.scalars(
@@ -103,6 +106,12 @@ def build_comparison(cube: Cube, allocations: list[CubeCardAllocation]) -> CubeC
         for allocation in item.allocations
         if allocation.status == MatchStatus.NAME_ONLY
     )
+    set_number = sum(
+        allocation.quantity
+        for item in allocations
+        for allocation in item.allocations
+        if allocation.status == MatchStatus.SET_NUMBER
+    )
     fulfilled_unique = sum(1 for item in allocations if item.missing_quantity == 0)
     missing_unique = sum(1 for item in allocations if item.missing_quantity > 0)
     unresolved = sum(item.missing_quantity for item in allocations if item.missing_quantity > 0)
@@ -116,6 +125,28 @@ def build_comparison(cube: Cube, allocations: list[CubeCardAllocation]) -> CubeC
         fulfilled_unique_cards=fulfilled_unique,
         total_unique_cards=len(allocations),
         exact_matched_copies=exact,
+        set_number_matched_copies=set_number,
         name_only_matched_copies=name_only,
         unresolved_match_count=unresolved,
     )
+
+
+def _cube_set_total(card: CubeCard) -> str | None:
+    try:
+        raw = json.loads(card.raw_source_data)
+    except ValueError:
+        return None
+    for key in (
+        "set_Total",
+        "setTotal",
+        "printedTotal",
+        "total",
+        "set_Printed_Total",
+        "setPrintedTotal",
+        "set_Card_Count",
+        "setCardCount",
+    ):
+        value = raw.get(key)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    return None
