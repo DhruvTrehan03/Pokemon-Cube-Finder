@@ -3,9 +3,13 @@ import io
 import re
 
 from app.adapters.cube_sources.base import ImportedCube, ImportedCubeCard
+from app.services.card_normalisation import parse_card_identifier
 
 
 _COUNT_PREFIX_RE = re.compile(r"^\s*(?P<count>\d+)\s*[xX]?\s+(?P<name>.+?)\s*$")
+_SET_NUMBER_RE = re.compile(
+    r"^\s*(?P<name>.+?)\s*[,;]\s*(?P<set>[A-Za-z0-9]+)\s*[,;]\s*(?P<number>[A-Za-z0-9]+(?:/[A-Za-z0-9]+)?)\s*$"
+)
 
 
 def parse_manual_cube(name: str, text: str, author: str | None = None) -> ImportedCube:
@@ -52,7 +56,21 @@ def _parse_lines(text: str) -> list[ImportedCubeCard]:
         match = _COUNT_PREFIX_RE.match(line)
         quantity = int(match.group("count")) if match else 1
         name = match.group("name") if match else line
-        cards.append(ImportedCubeCard(name=name.strip(), quantity=quantity, raw_source_data={"line": line}))
+        set_code, collector_number = parse_card_identifier(name)
+        structured = _SET_NUMBER_RE.match(name)
+        if structured:
+            name = structured.group("name")
+            set_code = structured.group("set")
+            collector_number = structured.group("number")
+        cards.append(
+            ImportedCubeCard(
+                name=name.strip(),
+                set_code=set_code,
+                collector_number=collector_number,
+                quantity=quantity,
+                raw_source_data={"line": line},
+            )
+        )
     return cards
 
 
@@ -61,19 +79,21 @@ def _parse_csv(text: str) -> list[ImportedCubeCard]:
     if not reader.fieldnames:
         raise ValueError("CSV cube list has no headers.")
     headers = {header.casefold().strip(): header for header in reader.fieldnames}
-    name_header = _first(headers, "name", "card name", "card")
+    name_header = _first(headers, "name", "card name", "card", "card id", "card_id", "id")
     if not name_header:
         raise ValueError("CSV cube list needs a card name column.")
     cards = []
     for row in reader:
         quantity_header = _first(headers, "quantity", "qty", "count")
         quantity = int(row.get(quantity_header, "1") or "1") if quantity_header else 1
+        parsed_set_code, parsed_number = parse_card_identifier(row[name_header])
         cards.append(
             ImportedCubeCard(
                 name=row[name_header].strip(),
                 set_name=_value(row, headers, "set", "set name"),
-                set_code=_value(row, headers, "set code", "set_code"),
-                collector_number=_value(row, headers, "collector number", "number"),
+                set_code=_value(row, headers, "set code", "set_code") or parsed_set_code,
+                collector_number=_value(row, headers, "collector number", "number")
+                or parsed_number,
                 quantity=quantity,
                 raw_source_data=row,
             )

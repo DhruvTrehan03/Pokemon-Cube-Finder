@@ -10,6 +10,16 @@ def test_manual_cube_line_import() -> None:
     assert cube.cards[1].name == "Charmander"
 
 
+def test_manual_cube_parses_cubekoga_card_ids() -> None:
+    cube = parse_manual_cube("CubeKoga IDs", "swsh11-046\n2 ex6-112\n")
+
+    assert cube.cards[0].name == "swsh11-046"
+    assert cube.cards[0].set_code == "SWSH11"
+    assert cube.cards[0].collector_number == "046"
+    assert cube.cards[1].quantity == 2
+    assert cube.cards[1].set_code == "EX6"
+
+
 def test_manual_cube_csv_import() -> None:
     cube = parse_manual_cube(
         "CSV Cube",

@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from app.services.card_normalisation import card_signature
+from app.services.card_normalisation import card_signature, collector_numbers_match
 
 
 class MatchStatus(StrEnum):
@@ -69,13 +69,16 @@ def allocate_cards(
             owned
             for owned in owned_cards
             if remaining[owned.id] > 0
-            and owned.normalised_name == cube_card.normalised_name
             and owned.set_code
             and cube_card.set_code
             and owned.collector_number
             and cube_card.collector_number
             and owned.set_code == cube_card.set_code
-            and owned.collector_number == cube_card.collector_number
+            and collector_numbers_match(owned.collector_number, cube_card.collector_number)
+            and (
+                owned.normalised_name == cube_card.normalised_name
+                or _looks_identifier_only(cube_card.original_name)
+            )
             and not _is_rejected(owned, cube_card, rejected_pairs)
         ]
         _consume(result, exact_candidates, remaining, required, MatchStatus.EXACT)
@@ -141,3 +144,7 @@ def _is_rejected(
         cube_card.original_name, cube_card.set_code, cube_card.collector_number
     )
     return (owned_sig, cube_sig) in rejected_pairs
+
+
+def _looks_identifier_only(value: str) -> bool:
+    return bool(value and "|" not in value and "-" in value and " " not in value.strip())

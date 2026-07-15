@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.services.card_normalisation import (
+    clean_display_card_name,
+    derive_set_code,
     normalise_card_name,
     normalise_collector_number,
     normalise_set_code,
@@ -99,14 +101,16 @@ def parse_collection_csv(raw_csv: str, mapping: dict[str, str | None]) -> list[P
         if not name_header or not row.get(name_header, "").strip():
             continue
         set_name = _optional(row, mapping.get("set_name"))
-        set_code = normalise_set_code(_optional(row, mapping.get("set_code")))
+        set_code = normalise_set_code(_optional(row, mapping.get("set_code"))) or derive_set_code(
+            set_name
+        )
         collector_number = normalise_collector_number(
             _optional(row, mapping.get("collector_number"))
         )
         printing = _optional(row, mapping.get("printing"))
         condition = _optional(row, mapping.get("condition"))
         parsed = ParsedOwnedCard(
-            original_name=row[name_header].strip(),
+            original_name=clean_display_card_name(row[name_header]),
             normalised_name=normalise_card_name(row[name_header]),
             set_name=set_name,
             normalised_set_name=normalise_set_name(set_name),

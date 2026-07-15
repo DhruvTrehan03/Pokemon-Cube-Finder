@@ -24,6 +24,16 @@ def test_exact_printing_beats_name_only_and_prevents_double_counting() -> None:
     assert allocations[1].status == MatchStatus.NAME_ONLY
 
 
+def test_identifier_only_cube_card_can_exact_match_collection_printing() -> None:
+    owned = [OwnedCardInput(1, "Ducklett", "ducklett", "SWSH11", "046/196", 1)]
+    cube_cards = [CubeCardInput(1, "swsh11-046", "swsh11-046", None, "SWSH11", "046", 1)]
+
+    allocations = allocate_cards(owned, cube_cards)
+
+    assert allocations[0].owned_quantity == 1
+    assert allocations[0].status == MatchStatus.EXACT
+
+
 def test_rejected_match_does_not_count_as_owned() -> None:
     owned = [OwnedCardInput(1, "Pikachu", "pikachu", None, None, 1)]
     cube_cards = [CubeCardInput(1, "Pikachu", "pikachu", None, None, None, 1)]

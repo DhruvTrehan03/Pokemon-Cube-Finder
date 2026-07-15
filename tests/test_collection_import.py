@@ -28,3 +28,15 @@ def test_csv_import_merges_duplicate_rows() -> None:
     assert cards[0].quantity == 3
     assert cards[0].set_code == "BS"
     assert cards[0].collector_number == "58"
+
+
+def test_csv_import_derives_set_code_from_tcgplayer_set_name() -> None:
+    raw = "Product Name,Set Name,Number,Quantity\nDucklett,SWSH11: Lost Origin,046/196,1\n"
+    headers, _rows = sniff_csv(raw)
+    mapping = detect_columns(headers).mapping
+
+    cards = parse_collection_csv(raw, mapping)
+
+    assert cards[0].original_name == "Ducklett"
+    assert cards[0].set_code == "SWSH11"
+    assert cards[0].collector_number == "046/196"
