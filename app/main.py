@@ -22,9 +22,10 @@ from app.services.card_normalisation import (
     normalise_set_code,
 )
 from app.services.collection_import import detect_columns, parse_collection_csv, sniff_csv
-from app.services.cube_comparison import compare_cube, compare_cubes
+from app.services.cube_comparison import compare_cube
 from app.services.exports import missing_cards_csv
 from app.services.ranking import rank_cubes
+from app.services.ranking_cache import load_saved_rankings, refresh_saved_rankings
 
 
 app = FastAPI(title="Pokemon Cube Finder")
@@ -59,8 +60,8 @@ async def dashboard(
     sort: str = "copy_completion",
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
-    cubes = session.scalars(select(Cube).order_by(Cube.name)).all()
-    comparisons = rank_cubes(compare_cubes(session, cubes), sort)
+    saved_rankings, rankings_computed_at = load_saved_rankings(session)
+    comparisons = rank_cubes(saved_rankings, sort)
     collection = session.scalars(
         select(Collection).order_by(Collection.imported_at.desc())
     ).first()
@@ -71,9 +72,16 @@ async def dashboard(
             "request": request,
             "comparisons": comparisons,
             "collection": collection,
+            "rankings_computed_at": rankings_computed_at,
             "sort": sort,
         },
     )
+
+
+@app.post("/rankings/refresh")
+async def rankings_refresh(session: Session = Depends(get_session)) -> RedirectResponse:
+    refresh_saved_rankings(session)
+    return RedirectResponse("/", status_code=303)
 
 
 @app.get("/collection", response_class=HTMLResponse)

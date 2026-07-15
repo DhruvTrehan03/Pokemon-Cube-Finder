@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -72,6 +72,39 @@ class CubeCard(Base):
     raw_source_data: Mapped[str] = mapped_column(Text, default="{}")
 
     cube: Mapped[Cube] = relationship(back_populates="cards")
+
+
+class CubeRanking(Base):
+    __tablename__ = "cube_rankings"
+    __table_args__ = (UniqueConstraint("cube_id", name="uq_cube_rankings_cube_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    cube_id: Mapped[int] = mapped_column(ForeignKey("cubes.id"), index=True)
+    computed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    total_required_copies: Mapped[int] = mapped_column(Integer, default=0)
+    owned_required_copies: Mapped[int] = mapped_column(Integer, default=0)
+    missing_copies: Mapped[int] = mapped_column(Integer, default=0)
+    missing_unique_cards: Mapped[int] = mapped_column(Integer, default=0)
+    fulfilled_unique_cards: Mapped[int] = mapped_column(Integer, default=0)
+    total_unique_cards: Mapped[int] = mapped_column(Integer, default=0)
+    exact_matched_copies: Mapped[int] = mapped_column(Integer, default=0)
+    set_number_matched_copies: Mapped[int] = mapped_column(Integer, default=0)
+    name_only_matched_copies: Mapped[int] = mapped_column(Integer, default=0)
+    unresolved_match_count: Mapped[int] = mapped_column(Integer, default=0)
+
+    cube: Mapped[Cube] = relationship()
+
+    @property
+    def copy_completion(self) -> float:
+        if self.total_required_copies == 0:
+            return 0.0
+        return self.owned_required_copies / self.total_required_copies
+
+    @property
+    def unique_completion(self) -> float:
+        if self.total_unique_cards == 0:
+            return 0.0
+        return self.fulfilled_unique_cards / self.total_unique_cards
 
 
 class CardMatchOverride(Base):

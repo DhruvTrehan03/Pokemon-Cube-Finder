@@ -6,13 +6,21 @@
     <h1>Cube Rankings</h1>
     {% if collection %}
       <p>{{ collection.name }} imported from {{ collection.source_filename or "CSV" }}</p>
+      {% if rankings_computed_at %}
+        <p>Rankings last refreshed at {{ rankings_computed_at }}</p>
+      {% else %}
+        <p>No saved rankings yet. Refresh rankings to compare the current cube library.</p>
+      {% endif %}
     {% else %}
       <p>Import your collection, then add cubes to compare.</p>
     {% endif %}
   </div>
   <div class="actions">
+    <form action="/rankings/refresh" method="post">
+      <button class="button primary" type="submit">Refresh Rankings</button>
+    </form>
     <a class="button" href="/collection">Import Collection</a>
-    <a class="button primary" href="/cubes/new">Import Cube</a>
+    <a class="button" href="/cubes/new">Import Cube</a>
   </div>
 </section>
 
@@ -42,7 +50,7 @@
         <th>Set-number</th>
         <th>Name-only</th>
         <th>Warnings</th>
-        <th>Refreshed</th>
+        <th>Ranked</th>
       </tr>
     </thead>
     <tbody>
@@ -60,10 +68,10 @@
         <td>{{ comparison.set_number_matched_copies }}</td>
         <td>{{ comparison.name_only_matched_copies }}</td>
         <td>{{ comparison.set_number_matched_copies + comparison.name_only_matched_copies + comparison.unresolved_match_count }}</td>
-        <td>{{ comparison.cube.refreshed_at or comparison.cube.imported_at }}</td>
+        <td>{{ comparison.computed_at }}</td>
       </tr>
       {% else %}
-      <tr><td colspan="13" class="empty">No cubes imported yet.</td></tr>
+      <tr><td colspan="13" class="empty">No saved rankings yet. Use Refresh Rankings when you are ready to recompute.</td></tr>
       {% endfor %}
     </tbody>
   </table>
