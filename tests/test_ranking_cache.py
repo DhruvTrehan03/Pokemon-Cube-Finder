@@ -42,7 +42,7 @@ def test_refresh_saved_rankings_persists_dashboard_results() -> None:
                 set_code=None,
                 collector_number=None,
                 required_quantity=2,
-                raw_source_data="{}",
+                raw_source_data='{"tcgPlayerMarket": 3.25, "cardmarketMarket": 2.5}',
             )
         )
         session.commit()
@@ -56,6 +56,10 @@ def test_refresh_saved_rankings_persists_dashboard_results() -> None:
         assert saved[0].cube.name == "Electric Cube"
         assert saved[0].owned_required_copies == 1
         assert saved[0].missing_copies == 1
+        assert saved[0].tcgplayer_missing_market_cost == 3.25
+        assert saved[0].cardmarket_missing_market_cost == 2.5
+        assert saved[0].priced_missing_copies == 1
+        assert saved[0].unpriced_missing_copies == 0
 
         refreshed_again = refresh_saved_rankings(session)
         saved_again, _ = load_saved_rankings(session)

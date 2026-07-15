@@ -31,6 +31,16 @@ def rank_cubes(
             comparisons,
             key=lambda item: (-item.unique_completion, item.missing_copies, item.cube.name.casefold()),
         )
+    if sort == "cost_to_complete":
+        return sorted(
+            comparisons,
+            key=lambda item: (
+                item.tcgplayer_missing_market_cost,
+                item.unpriced_missing_copies,
+                item.missing_copies,
+                item.cube.name.casefold(),
+            ),
+        )
     if sort == "cube_name":
         return sorted(comparisons, key=lambda item: item.cube.name.casefold())
     return sorted(

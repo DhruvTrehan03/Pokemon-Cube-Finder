@@ -43,10 +43,14 @@ class BulkImportStatus:
     started_at: datetime | None = None
     finished_at: datetime | None = None
     errors: list[str] = field(default_factory=list)
+    label: str = "CubeKoga import"
+    completed_message: str = "Complete."
 
 
 bulk_import_status = BulkImportStatus()
 bulk_import_task: asyncio.Task[None] | None = None
+rankings_refresh_status = BulkImportStatus(label="Rankings refresh")
+rankings_refresh_task: asyncio.Task[None] | None = None
 
 
 @app.on_event("startup")
@@ -78,10 +82,29 @@ async def dashboard(
     )
 
 
+@app.get("/rankings/refresh", response_class=HTMLResponse)
+async def rankings_refresh_form(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(request, "rankings_refresh.html", {"request": request})
+
+
 @app.post("/rankings/refresh")
-async def rankings_refresh(session: Session = Depends(get_session)) -> RedirectResponse:
-    refresh_saved_rankings(session)
-    return RedirectResponse("/", status_code=303)
+async def rankings_refresh(
+    refresh_prices: Annotated[bool, Form()] = False,
+) -> RedirectResponse:
+    global rankings_refresh_task
+    if rankings_refresh_task and not rankings_refresh_task.done():
+        return RedirectResponse("/rankings/refresh/status", status_code=303)
+    rankings_refresh_task = asyncio.create_task(
+        refresh_rankings_job(refresh_prices=refresh_prices)
+    )
+    return RedirectResponse("/rankings/refresh/status", status_code=303)
+
+
+@app.get("/rankings/refresh/status", response_class=HTMLResponse)
+async def rankings_refresh_status_page(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request, "rankings_refresh_status.html", {"status": rankings_refresh_status}
+    )
 
 
 @app.get("/collection", response_class=HTMLResponse)
@@ -350,6 +373,8 @@ def _cubekoga_id_from_raw_data(raw_source_data: str | None) -> str | None:
 async def import_all_cubekoga_cubes(max_cubes: int | None = None) -> None:
     source = CubeKogaSource()
     bulk_import_status.running = True
+    bulk_import_status.label = "CubeKoga import"
+    bulk_import_status.completed_message = "Import complete."
     bulk_import_status.total = None
     bulk_import_status.imported = 0
     bulk_import_status.failed = 0
@@ -386,3 +411,57 @@ async def import_all_cubekoga_cubes(max_cubes: int | None = None) -> None:
         bulk_import_status.running = False
         bulk_import_status.current_cube = None
         bulk_import_status.finished_at = datetime.utcnow()
+
+
+async def refresh_rankings_job(refresh_prices: bool = False) -> None:
+    rankings_refresh_status.running = True
+    rankings_refresh_status.total = None
+    rankings_refresh_status.imported = 0
+    rankings_refresh_status.failed = 0
+    rankings_refresh_status.current_cube = None
+    rankings_refresh_status.started_at = datetime.utcnow()
+    rankings_refresh_status.finished_at = None
+    rankings_refresh_status.errors.clear()
+    rankings_refresh_status.label = (
+        "CubeKoga price refresh" if refresh_prices else "Rankings refresh"
+    )
+    rankings_refresh_status.completed_message = "Rankings refreshed."
+    try:
+        if refresh_prices:
+            await refresh_cubekoga_prices()
+        rankings_refresh_status.current_cube = "Recomputing saved rankings"
+        with SessionLocal() as session:
+            count = refresh_saved_rankings(session)
+        rankings_refresh_status.imported = count
+        rankings_refresh_status.total = count
+    except Exception as exc:  # noqa: BLE001 - surface refresh failure in UI.
+        rankings_refresh_status.failed += 1
+        rankings_refresh_status.errors.append(str(exc))
+    finally:
+        rankings_refresh_status.running = False
+        rankings_refresh_status.current_cube = None
+        rankings_refresh_status.finished_at = datetime.utcnow()
+
+
+async def refresh_cubekoga_prices() -> None:
+    source = CubeKogaSource()
+    with SessionLocal() as session:
+        cubes = session.scalars(
+            select(Cube)
+            .where(Cube.source_type == "cubekoga")
+            .order_by(Cube.name)
+        ).all()
+        urls = [cube.source_url for cube in cubes if cube.source_url]
+    rankings_refresh_status.total = len(urls)
+    for url in urls:
+        try:
+            imported = await source.fetch_cube(url)
+            rankings_refresh_status.current_cube = imported.name
+            with SessionLocal() as session:
+                save_imported_cube(session, imported, scan_cubekoga_id=False)
+            rankings_refresh_status.imported += 1
+        except Exception as exc:  # noqa: BLE001 - keep price refresh moving.
+            rankings_refresh_status.failed += 1
+            if len(rankings_refresh_status.errors) < 20:
+                rankings_refresh_status.errors.append(f"{url}: {exc}")
+        await asyncio.sleep(0.15)

@@ -38,6 +38,10 @@ def refresh_saved_rankings(session: Session) -> int:
                 set_number_matched_copies=comparison.set_number_matched_copies,
                 name_only_matched_copies=comparison.name_only_matched_copies,
                 unresolved_match_count=comparison.unresolved_match_count,
+                tcgplayer_missing_market_cost=comparison.tcgplayer_missing_market_cost,
+                cardmarket_missing_market_cost=comparison.cardmarket_missing_market_cost,
+                priced_missing_copies=comparison.priced_missing_copies,
+                unpriced_missing_copies=comparison.unpriced_missing_copies,
             )
         )
     session.commit()

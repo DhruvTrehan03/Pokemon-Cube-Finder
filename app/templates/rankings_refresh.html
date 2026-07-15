@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Refresh Rankings - Pokemon Cube Finder{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <h1>Refresh Rankings</h1>
+    <p>Choose how much work to do before saving a new rankings snapshot.</p>
+  </div>
+  <div class="actions">
+    <a class="button" href="/">Back to Rankings</a>
+  </div>
+</section>
+
+<section class="split">
+  <form class="panel" action="/rankings/refresh" method="post">
+    <h2>Rank With Saved Prices</h2>
+    <p>Recompute completion and cost using the card data already imported locally.</p>
+    <button class="button primary" type="submit">Refresh Rankings</button>
+  </form>
+
+  <form class="panel" action="/rankings/refresh" method="post">
+    <h2>Refresh CubeKoga Prices First</h2>
+    <p>Re-fetch CubeKoga cubes to update card prices, then recompute and save rankings.</p>
+    <input type="hidden" name="refresh_prices" value="true">
+    <button class="button primary" type="submit">Refresh Prices and Rankings</button>
+  </form>
+</section>
+{% endblock %}

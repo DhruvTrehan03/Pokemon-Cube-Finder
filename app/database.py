@@ -1,6 +1,6 @@
 from collections.abc import AsyncGenerator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import get_settings
@@ -25,7 +25,29 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False
 
 def init_db() -> None:
     Base.metadata.create_all(bind=engine)
+    ensure_schema_columns()
     backfill_normalised_identifiers()
+
+
+def ensure_schema_columns() -> None:
+    if not get_settings().database_url.startswith("sqlite"):
+        return
+    with engine.begin() as connection:
+        ranking_columns = {
+            row[1]
+            for row in connection.execute(text("PRAGMA table_info(cube_rankings)")).all()
+        }
+        additions = {
+            "tcgplayer_missing_market_cost": "FLOAT DEFAULT 0.0",
+            "cardmarket_missing_market_cost": "FLOAT DEFAULT 0.0",
+            "priced_missing_copies": "INTEGER DEFAULT 0",
+            "unpriced_missing_copies": "INTEGER DEFAULT 0",
+        }
+        for column, definition in additions.items():
+            if column not in ranking_columns:
+                connection.execute(
+                    text(f"ALTER TABLE cube_rankings ADD COLUMN {column} {definition}")
+                )
 
 
 def backfill_normalised_identifiers() -> None:

@@ -16,9 +16,7 @@
     {% endif %}
   </div>
   <div class="actions">
-    <form action="/rankings/refresh" method="post">
-      <button class="button primary" type="submit">Refresh Rankings</button>
-    </form>
+    <a class="button primary" href="/rankings/refresh">Refresh Rankings</a>
     <a class="button" href="/collection">Import Collection</a>
     <a class="button" href="/cubes/new">Import Cube</a>
   </div>
@@ -29,6 +27,7 @@
   <select id="sort" name="sort" onchange="this.form.submit()">
     <option value="copy_completion" {% if sort == "copy_completion" %}selected{% endif %}>Copy completion</option>
     <option value="missing_copies" {% if sort == "missing_copies" %}selected{% endif %}>Missing copies</option>
+    <option value="cost_to_complete" {% if sort == "cost_to_complete" %}selected{% endif %}>Cost to complete</option>
     <option value="unique_completion" {% if sort == "unique_completion" %}selected{% endif %}>Unique completion</option>
     <option value="cube_name" {% if sort == "cube_name" %}selected{% endif %}>Cube name</option>
   </select>
@@ -44,6 +43,7 @@
         <th>Total</th>
         <th>Owned</th>
         <th>Missing</th>
+        <th>Cost</th>
         <th>Copy %</th>
         <th>Unique %</th>
         <th>Exact</th>
@@ -62,6 +62,12 @@
         <td>{{ comparison.total_required_copies }}</td>
         <td>{{ comparison.owned_required_copies }}</td>
         <td>{{ comparison.missing_copies }}</td>
+        <td>
+          ${{ "%.2f"|format(comparison.tcgplayer_missing_market_cost or 0) }}
+          {% if comparison.unpriced_missing_copies %}
+            <span class="badge">{{ comparison.unpriced_missing_copies }} unpriced</span>
+          {% endif %}
+        </td>
         <td>{{ "%.1f"|format(comparison.copy_completion * 100) }}%</td>
         <td>{{ "%.1f"|format(comparison.unique_completion * 100) }}%</td>
         <td>{{ comparison.exact_matched_copies }}</td>
@@ -71,7 +77,7 @@
         <td>{{ comparison.computed_at }}</td>
       </tr>
       {% else %}
-      <tr><td colspan="13" class="empty">No saved rankings yet. Use Refresh Rankings when you are ready to recompute.</td></tr>
+      <tr><td colspan="14" class="empty">No saved rankings yet. Use Refresh Rankings when you are ready to recompute.</td></tr>
       {% endfor %}
     </tbody>
   </table>

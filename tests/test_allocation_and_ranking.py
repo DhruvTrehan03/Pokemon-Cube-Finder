@@ -65,6 +65,40 @@ def test_set_number_fallback_respects_cube_set_total_when_available() -> None:
     assert allocations[0].status == MatchStatus.NAME_ONLY
 
 
+def test_missing_card_cost_uses_cube_card_market_price() -> None:
+    cube = SimpleNamespace(id=1, name="Priced Cube")
+    comparison = build_comparison(
+        cube,
+        [
+            allocate_cards(
+                [],
+                [
+                    CubeCardInput(
+                        1,
+                        "Charizard",
+                        "charizard",
+                        None,
+                        None,
+                        None,
+                        2,
+                        tcgplayer_market_price=12.5,
+                        cardmarket_market_price=8.0,
+                    )
+                ],
+            )[0],
+            allocate_cards(
+                [],
+                [CubeCardInput(2, "Pikachu", "pikachu", None, None, None, 1)],
+            )[0],
+        ],
+    )
+
+    assert comparison.tcgplayer_missing_market_cost == 25.0
+    assert comparison.cardmarket_missing_market_cost == 16.0
+    assert comparison.priced_missing_copies == 2
+    assert comparison.unpriced_missing_copies == 1
+
+
 def test_rejected_match_does_not_count_as_owned() -> None:
     owned = [OwnedCardInput(1, "Pikachu", "pikachu", None, None, 1)]
     cube_cards = [CubeCardInput(1, "Pikachu", "pikachu", None, None, None, 1)]

@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Refresh Status - Pokemon Cube Finder{% endblock %}
+{% block head_extra %}
+  {% if status.running %}
+    <meta http-equiv="refresh" content="5">
+  {% endif %}
+{% endblock %}
+{% block content %}
+{% if status.running %}
+  {% set progress = (status.imported / status.total * 100) if status.total else 0 %}
+{% else %}
+  {% set progress = 100 if status.imported else 0 %}
+{% endif %}
+<section class="page-head">
+  <div>
+    <h1>{{ status.label }}</h1>
+    {% if status.running %}
+      <p>Working in the background. This page refreshes while the job is running.</p>
+    {% elif status.finished_at %}
+      <p>{{ status.completed_message }}</p>
+    {% else %}
+      <p>No rankings refresh is currently running.</p>
+    {% endif %}
+  </div>
+  <div class="actions">
+    <a class="button" href="/rankings/refresh">Refresh Options</a>
+    <a class="button primary" href="/">View Rankings</a>
+  </div>
+</section>
+
+<section class="section">
+  <div class="summary-grid">
+    <div class="metric">
+      <span>Processed</span>
+      <strong>{{ status.imported }}</strong>
+    </div>
+    <div class="metric">
+      <span>Total</span>
+      <strong>{{ status.total or "..." }}</strong>
+    </div>
+    <div class="metric">
+      <span>Failed</span>
+      <strong>{{ status.failed }}</strong>
+    </div>
+    <div class="metric">
+      <span>Status</span>
+      <strong>{{ "Running" if status.running else "Idle" }}</strong>
+    </div>
+  </div>
+
+  <div class="progress" aria-label="Refresh progress">
+    <span style="width: {{ "%.1f"|format(progress) }}%"></span>
+  </div>
+
+  {% if status.current_cube %}
+    <p><strong>Current step:</strong> {{ status.current_cube }}</p>
+  {% endif %}
+  {% if status.started_at %}
+    <p><strong>Started:</strong> {{ status.started_at }}</p>
+  {% endif %}
+  {% if status.finished_at %}
+    <p><strong>Finished:</strong> {{ status.finished_at }}</p>
+  {% endif %}
+</section>
+
+{% if status.errors %}
+<section class="section">
+  <h2>Recent Errors</h2>
+  <ul class="error-list">
+    {% for error in status.errors %}
+      <li>{{ error }}</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endblock %}

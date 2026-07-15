@@ -36,6 +36,8 @@ class CubeCardInput:
     collector_number: str | None
     required_quantity: int
     set_total: str | None = None
+    tcgplayer_market_price: float | None = None
+    cardmarket_market_price: float | None = None
 
 
 @dataclass(frozen=True)

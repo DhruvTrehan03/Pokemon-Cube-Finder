@@ -29,6 +29,10 @@ class CubeComparison:
     set_number_matched_copies: int
     name_only_matched_copies: int
     unresolved_match_count: int
+    tcgplayer_missing_market_cost: float
+    cardmarket_missing_market_cost: float
+    priced_missing_copies: int
+    unpriced_missing_copies: int
 
     @property
     def copy_completion(self) -> float:
@@ -114,6 +118,8 @@ def _cube_card_input(card: CubeCard) -> CubeCardInput:
         collector_number=card.collector_number,
         set_total=_cube_set_total(card),
         required_quantity=card.required_quantity,
+        tcgplayer_market_price=_cube_card_price(card, "tcgPlayerMarket"),
+        cardmarket_market_price=_cube_card_price(card, "cardmarketMarket"),
     )
 
 
@@ -150,6 +156,20 @@ def build_comparison(cube: Cube, allocations: list[CubeCardAllocation]) -> CubeC
     fulfilled_unique = sum(1 for item in allocations if item.missing_quantity == 0)
     missing_unique = sum(1 for item in allocations if item.missing_quantity > 0)
     unresolved = sum(item.missing_quantity for item in allocations if item.missing_quantity > 0)
+    tcgplayer_cost = 0.0
+    cardmarket_cost = 0.0
+    priced_missing = 0
+    unpriced_missing = 0
+    for item in allocations:
+        if item.missing_quantity <= 0:
+            continue
+        if item.cube_card.tcgplayer_market_price is None:
+            unpriced_missing += item.missing_quantity
+        else:
+            priced_missing += item.missing_quantity
+            tcgplayer_cost += item.missing_quantity * item.cube_card.tcgplayer_market_price
+        if item.cube_card.cardmarket_market_price is not None:
+            cardmarket_cost += item.missing_quantity * item.cube_card.cardmarket_market_price
     return CubeComparison(
         cube=cube,
         allocations=allocations,
@@ -163,6 +183,10 @@ def build_comparison(cube: Cube, allocations: list[CubeCardAllocation]) -> CubeC
         set_number_matched_copies=set_number,
         name_only_matched_copies=name_only,
         unresolved_match_count=unresolved,
+        tcgplayer_missing_market_cost=tcgplayer_cost,
+        cardmarket_missing_market_cost=cardmarket_cost,
+        priced_missing_copies=priced_missing,
+        unpriced_missing_copies=unpriced_missing,
     )
 
 
@@ -185,3 +209,17 @@ def _cube_set_total(card: CubeCard) -> str | None:
         if value is not None and str(value).strip():
             return str(value).strip()
     return None
+
+
+def _cube_card_price(card: CubeCard, key: str) -> float | None:
+    try:
+        raw = json.loads(card.raw_source_data)
+    except ValueError:
+        return None
+    value = raw.get(key)
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None

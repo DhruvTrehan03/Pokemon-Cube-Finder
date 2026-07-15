@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -91,6 +91,10 @@ class CubeRanking(Base):
     set_number_matched_copies: Mapped[int] = mapped_column(Integer, default=0)
     name_only_matched_copies: Mapped[int] = mapped_column(Integer, default=0)
     unresolved_match_count: Mapped[int] = mapped_column(Integer, default=0)
+    tcgplayer_missing_market_cost: Mapped[float] = mapped_column(Float, default=0.0)
+    cardmarket_missing_market_cost: Mapped[float] = mapped_column(Float, default=0.0)
+    priced_missing_copies: Mapped[int] = mapped_column(Integer, default=0)
+    unpriced_missing_copies: Mapped[int] = mapped_column(Integer, default=0)
 
     cube: Mapped[Cube] = relationship()
 
