@@ -71,6 +71,12 @@ p { color: var(--muted); margin: 0 0 12px; }
   margin-bottom: 18px;
 }
 .toolbar { display: flex; align-items: center; gap: 10px; }
+.panel-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
 .split { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
 label { display: grid; gap: 6px; margin-bottom: 12px; color: var(--muted); font-weight: 600; }
 input, select, textarea {
@@ -130,9 +136,10 @@ tr:last-child td { border-bottom: 0; }
   font-size: 12px;
   white-space: nowrap;
 }
+.error-list { margin: 0; padding-left: 20px; color: var(--error); }
 
 @media (max-width: 800px) {
-  .page-head, .topbar { align-items: stretch; flex-direction: column; }
+  .page-head, .panel-row, .topbar { align-items: stretch; flex-direction: column; }
   .split, .mapping-grid, .summary-grid { grid-template-columns: 1fr; }
   h1 { font-size: 26px; }
 }

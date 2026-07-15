@@ -4,11 +4,23 @@
 <section class="page-head">
   <div>
     <h1>Import Cube</h1>
-    <p>Add a CubeKoga URL or paste a list manually.</p>
+    <p>Add one CubeKoga URL, import all public CubeKoga cubes, or paste a list manually.</p>
   </div>
 </section>
 
 {% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+<section class="panel">
+  <div class="panel-row">
+    <div>
+      <h2>All Public CubeKoga Cubes</h2>
+      <p>Import the public CubeKoga directory in the background and rank every cube against your collection.</p>
+    </div>
+    <form action="/cubes/cubekoga/all" method="post">
+      <button class="button primary" type="submit">Import All CubeKoga Cubes</button>
+    </form>
+  </div>
+</section>
 
 <section class="split">
   <form class="panel" action="/cubes/cubekoga" method="post">

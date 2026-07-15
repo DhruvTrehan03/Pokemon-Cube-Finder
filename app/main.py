@@ -1,5 +1,7 @@
+import asyncio
 import json
 from datetime import datetime
+from dataclasses import dataclass, field
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -12,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.adapters.cube_sources.base import ImportedCube
 from app.adapters.cube_sources.cubekoga import CubeKogaImportError, CubeKogaSource
 from app.adapters.cube_sources.manual import parse_manual_cube
-from app.database import get_session, init_db
+from app.database import SessionLocal, get_session, init_db
 from app.models import Collection, Cube, CubeCard, OwnedCard
 from app.services.card_normalisation import (
     normalise_card_name,
@@ -28,6 +30,22 @@ from app.services.ranking import rank_cubes
 app = FastAPI(title="Pokemon Cube Finder")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
+
+
+@dataclass
+class BulkImportStatus:
+    running: bool = False
+    total: int | None = None
+    imported: int = 0
+    failed: int = 0
+    current_cube: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    errors: list[str] = field(default_factory=list)
+
+
+bulk_import_status = BulkImportStatus()
+bulk_import_task: asyncio.Task[None] | None = None
 
 
 @app.on_event("startup")
@@ -184,6 +202,24 @@ async def cube_cubekoga_import(
     return RedirectResponse(f"/cubes/{cube.id}", status_code=303)
 
 
+@app.post("/cubes/cubekoga/all")
+async def cube_cubekoga_import_all(
+    max_cubes: Annotated[int | None, Form()] = None,
+) -> RedirectResponse:
+    global bulk_import_task
+    if bulk_import_task and not bulk_import_task.done():
+        return RedirectResponse("/cubes/import/status", status_code=303)
+    bulk_import_task = asyncio.create_task(import_all_cubekoga_cubes(max_cubes=max_cubes))
+    return RedirectResponse("/cubes/import/status", status_code=303)
+
+
+@app.get("/cubes/import/status", response_class=HTMLResponse)
+async def cube_import_status(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request, "cube_import_status.html", {"status": bulk_import_status}
+    )
+
+
 @app.get("/cubes/{cube_id}", response_class=HTMLResponse)
 async def cube_detail(
     cube_id: int, request: Request, session: Session = Depends(get_session)
@@ -211,12 +247,18 @@ async def cube_missing_export(cube_id: int, session: Session = Depends(get_sessi
     )
 
 
-def save_imported_cube(session: Session, imported: ImportedCube) -> Cube:
+def save_imported_cube(
+    session: Session, imported: ImportedCube, scan_cubekoga_id: bool = True
+) -> Cube:
     existing = None
     if imported.source_url:
         existing = session.scalars(
             select(Cube).where(Cube.source_url == imported.source_url)
         ).first()
+    if existing is None and imported.source_type == "cubekoga" and scan_cubekoga_id:
+        cube_id = _imported_cubekoga_id(imported)
+        if cube_id:
+            existing = _find_existing_cubekoga_cube(session, cube_id)
 
     cube = existing or Cube(source_type=imported.source_type)
     cube.name = imported.name
@@ -247,3 +289,92 @@ def save_imported_cube(session: Session, imported: ImportedCube) -> Cube:
         )
     session.commit()
     return cube
+
+
+def _imported_cubekoga_id(imported: ImportedCube) -> str | None:
+    metadata = imported.raw_source_data.get("metadata")
+    if not isinstance(metadata, dict):
+        return None
+    cube_id = metadata.get("cube_ID") or metadata.get("cubeId") or metadata.get("id")
+    return str(cube_id) if cube_id else None
+
+
+def _find_existing_cubekoga_cube(session: Session, cube_id: str) -> Cube | None:
+    for cube in session.scalars(select(Cube).where(Cube.source_type == "cubekoga")):
+        try:
+            raw = json.loads(cube.raw_source_data)
+        except ValueError:
+            continue
+        metadata = raw.get("metadata")
+        if not isinstance(metadata, dict):
+            continue
+        existing_id = metadata.get("cube_ID") or metadata.get("cubeId") or metadata.get("id")
+        if str(existing_id) == cube_id:
+            return cube
+    return None
+
+
+def _backfill_cubekoga_source_urls(session: Session) -> None:
+    changed = False
+    for cube in session.scalars(select(Cube).where(Cube.source_type == "cubekoga")):
+        cube_id = _cubekoga_id_from_raw_data(cube.raw_source_data)
+        if cube_id and cube.source_url != f"https://cubekoga.net/cube/{cube_id}":
+            cube.source_url = f"https://cubekoga.net/cube/{cube_id}"
+            changed = True
+    if changed:
+        session.commit()
+
+
+def _cubekoga_id_from_raw_data(raw_source_data: str | None) -> str | None:
+    if not raw_source_data:
+        return None
+    try:
+        raw = json.loads(raw_source_data)
+    except ValueError:
+        return None
+    metadata = raw.get("metadata")
+    if not isinstance(metadata, dict):
+        return None
+    cube_id = metadata.get("cube_ID") or metadata.get("cubeId") or metadata.get("id")
+    return str(cube_id) if cube_id else None
+
+
+async def import_all_cubekoga_cubes(max_cubes: int | None = None) -> None:
+    source = CubeKogaSource()
+    bulk_import_status.running = True
+    bulk_import_status.total = None
+    bulk_import_status.imported = 0
+    bulk_import_status.failed = 0
+    bulk_import_status.current_cube = None
+    bulk_import_status.started_at = datetime.utcnow()
+    bulk_import_status.finished_at = None
+    bulk_import_status.errors.clear()
+    try:
+        bulk_import_status.total = await source.public_cube_count()
+        if max_cubes is not None:
+            bulk_import_status.total = (
+                min(max_cubes, bulk_import_status.total)
+                if bulk_import_status.total is not None
+                else max_cubes
+            )
+        with SessionLocal() as session:
+            _backfill_cubekoga_source_urls(session)
+        async for imported in source.iter_public_cubes(
+            page_size=50, delay_seconds=0.15, max_cubes=max_cubes
+        ):
+            bulk_import_status.current_cube = imported.name
+            try:
+                with SessionLocal() as session:
+                    save_imported_cube(session, imported, scan_cubekoga_id=False)
+                bulk_import_status.imported += 1
+            except Exception as exc:  # noqa: BLE001 - keep batch import moving.
+                bulk_import_status.failed += 1
+                if len(bulk_import_status.errors) < 20:
+                    bulk_import_status.errors.append(f"{imported.name}: {exc}")
+    except Exception as exc:  # noqa: BLE001 - surface batch-level failure in UI.
+        bulk_import_status.failed += 1
+        bulk_import_status.errors.append(str(exc))
+    finally:
+        bulk_import_status.running = False
+        bulk_import_status.current_cube = None
+        bulk_import_status.finished_at = datetime.utcnow()

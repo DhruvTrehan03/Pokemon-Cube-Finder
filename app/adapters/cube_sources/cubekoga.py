@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import re
+from collections.abc import AsyncIterator
 from typing import Any
 from urllib.parse import quote, urlparse
 
@@ -49,10 +51,66 @@ class CubeKogaSource:
             "Use manual cube import for this list, or paste a sample URL for adapter hardening."
         )
 
+    async def iter_public_cubes(
+        self,
+        page_size: int = 50,
+        delay_seconds: float = 0.1,
+        max_cubes: int | None = None,
+    ) -> AsyncIterator[ImportedCube]:
+        settings = get_settings()
+        headers = {"User-Agent": settings.cubekoga_user_agent, "Accept": "application/json"}
+        imported_count = 0
+        skip = 0
+        async with httpx.AsyncClient(timeout=30.0, headers=headers, follow_redirects=True) as client:
+            while True:
+                page = await _get_json(
+                    client,
+                    f"{self.api_base}/cubes/all?skip={skip}&take={page_size}&sort=likes",
+                )
+                if not isinstance(page, dict):
+                    raise CubeKogaImportError("Could not fetch CubeKoga public cube list.")
+                items = page.get("items")
+                if not isinstance(items, list) or not items:
+                    return
+                for metadata in items:
+                    if not isinstance(metadata, dict):
+                        continue
+                    cube_id = metadata.get("cube_ID")
+                    if not cube_id:
+                        continue
+                    imported = await self._fetch_from_api(
+                        client,
+                        str(cube_id),
+                        _canonical_cube_url(cube_id),
+                        metadata=metadata,
+                    )
+                    if imported:
+                        yield imported
+                        imported_count += 1
+                        if max_cubes is not None and imported_count >= max_cubes:
+                            return
+                    await asyncio.sleep(delay_seconds)
+                skip += len(items)
+                if page.get("hasMore") is False:
+                    return
+
+    async def public_cube_count(self) -> int | None:
+        settings = get_settings()
+        headers = {"User-Agent": settings.cubekoga_user_agent, "Accept": "application/json"}
+        async with httpx.AsyncClient(timeout=15.0, headers=headers, follow_redirects=True) as client:
+            page = await _get_json(client, f"{self.api_base}/cubes/all?skip=0&take=1&sort=likes")
+        if isinstance(page, dict) and isinstance(page.get("totalCount"), int):
+            return page["totalCount"]
+        return None
+
     async def _fetch_from_api(
-        self, client: httpx.AsyncClient, slug: str, source_url: str
+        self,
+        client: httpx.AsyncClient,
+        slug: str,
+        source_url: str,
+        metadata: dict[str, Any] | None = None,
     ) -> ImportedCube | None:
-        metadata = await _get_json(client, f"{self.api_base}/cubes/cube/{slug}")
+        metadata = metadata or await _get_json(client, f"{self.api_base}/cubes/cube/{slug}")
         if metadata is None:
             metadata = await _get_json(client, f"{self.api_base}/cubes/shared/{slug}")
         if metadata is None and not slug.isdigit():
@@ -76,7 +134,7 @@ class CubeKogaSource:
             author=_string_or_none(metadata.get("creatorName")),
             description=_string_or_none(metadata.get("overview") or metadata.get("description")),
             source_type="cubekoga",
-            source_url=source_url,
+            source_url=_canonical_cube_url(cube_id),
             cards=cards,
             raw_source_data={"metadata": metadata, "cards": cards_payload},
         )
@@ -89,6 +147,10 @@ def _normalise_url(url: str) -> str:
     if not re.match(r"^https?://", url, flags=re.IGNORECASE):
         url = f"https://{url}"
     return url
+
+
+def _canonical_cube_url(cube_id: Any) -> str:
+    return f"https://cubekoga.net/cube/{cube_id}"
 
 
 def _extract_slug(path: str) -> str | None:
