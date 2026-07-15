@@ -30,7 +30,11 @@ def test_refresh_saved_rankings_persists_dashboard_results() -> None:
                 raw_import_data="{}",
             )
         )
-        cube = Cube(name="Electric Cube", source_type="manual", raw_source_data="{}")
+        cube = Cube(
+            name="Electric Cube",
+            source_type="cubekoga",
+            raw_source_data='{"metadata": {"cube_Like_Count": 42}}',
+        )
         session.add(cube)
         session.flush()
         session.add(
@@ -60,6 +64,7 @@ def test_refresh_saved_rankings_persists_dashboard_results() -> None:
         assert saved[0].cardmarket_missing_market_cost == 2.5
         assert saved[0].priced_missing_copies == 1
         assert saved[0].unpriced_missing_copies == 0
+        assert saved[0].cubekoga_likes == 42
 
         refreshed_again = refresh_saved_rankings(session)
         saved_again, _ = load_saved_rankings(session)

@@ -95,6 +95,7 @@ class CubeRanking(Base):
     cardmarket_missing_market_cost: Mapped[float] = mapped_column(Float, default=0.0)
     priced_missing_copies: Mapped[int] = mapped_column(Integer, default=0)
     unpriced_missing_copies: Mapped[int] = mapped_column(Integer, default=0)
+    cubekoga_likes: Mapped[int | None] = mapped_column(Integer, index=True)
 
     cube: Mapped[Cube] = relationship()
 

@@ -41,6 +41,15 @@ def rank_cubes(
                 item.cube.name.casefold(),
             ),
         )
+    if sort == "cubekoga_likes":
+        return sorted(
+            comparisons,
+            key=lambda item: (
+                -(item.cubekoga_likes or 0),
+                item.missing_copies,
+                item.cube.name.casefold(),
+            ),
+        )
     if sort == "cube_name":
         return sorted(comparisons, key=lambda item: item.cube.name.casefold())
     return sorted(

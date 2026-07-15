@@ -42,6 +42,7 @@ def ensure_schema_columns() -> None:
             "cardmarket_missing_market_cost": "FLOAT DEFAULT 0.0",
             "priced_missing_copies": "INTEGER DEFAULT 0",
             "unpriced_missing_copies": "INTEGER DEFAULT 0",
+            "cubekoga_likes": "INTEGER",
         }
         for column, definition in additions.items():
             if column not in ranking_columns:

@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 
 from sqlalchemy import delete, func, select
@@ -42,7 +43,27 @@ def refresh_saved_rankings(session: Session) -> int:
                 cardmarket_missing_market_cost=comparison.cardmarket_missing_market_cost,
                 priced_missing_copies=comparison.priced_missing_copies,
                 unpriced_missing_copies=comparison.unpriced_missing_copies,
+                cubekoga_likes=_cubekoga_like_count(comparison.cube),
             )
         )
     session.commit()
     return len(comparisons)
+
+
+def _cubekoga_like_count(cube: Cube) -> int | None:
+    try:
+        raw = json.loads(cube.raw_source_data)
+    except ValueError:
+        return None
+    metadata = raw.get("metadata")
+    if not isinstance(metadata, dict):
+        return None
+    for key in ("cube_Like_Count", "cubeLikeCount", "likeCount", "likes"):
+        value = metadata.get(key)
+        if value is None or value == "":
+            continue
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            continue
+    return None
